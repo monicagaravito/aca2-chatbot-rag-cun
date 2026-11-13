@@ -133,19 +133,22 @@ with tab_chat:
                 st.session_state.pregunta_ejemplo = ej
                 st.rerun()
 
-    for m in st.session_state.mensajes:
-        with st.chat_message(m["role"], avatar="🧑‍🎓" if m["role"] == "user" else "🎓"):
-            st.markdown(m["content"])
-            if m.get("resultado"):
-                mostrar_fuentes(m["resultado"])
+    # Contenedor de la conversación: los mensajes nuevos se dibujan aquí, SIEMPRE encima del cuadro de texto
+    conversacion = st.container()
+    with conversacion:
+        for m in st.session_state.mensajes:
+            with st.chat_message(m["role"], avatar="🧑‍🎓" if m["role"] == "user" else "🎓"):
+                st.markdown(m["content"])
+                if m.get("resultado"):
+                    mostrar_fuentes(m["resultado"])
 
     pregunta = st.chat_input("Escribe tu pregunta...") or st.session_state.pop("pregunta_ejemplo", None)
     if pregunta:
         historial = [{"role": m["role"], "content": m["content"]} for m in st.session_state.mensajes]
         st.session_state.mensajes.append({"role": "user", "content": pregunta})
-        with st.chat_message("user", avatar="🧑‍🎓"):
+        with conversacion, st.chat_message("user", avatar="🧑‍🎓"):
             st.markdown(pregunta)
-        with st.chat_message("assistant", avatar="🎓"):
+        with conversacion, st.chat_message("assistant", avatar="🎓"):
             with st.spinner("Buscando en la base vectorial y redactando..."):
                 try:
                     inicio = time.time()
