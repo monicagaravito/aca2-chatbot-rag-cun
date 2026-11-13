@@ -6,6 +6,9 @@
 
 **Integrantes:** Jhoan Ezequiel Hurtado Ramos · Melania Martinez · Anderson Rojas · Camila Artega · Monica Garavito
 
+**🔗 Aplicación en línea:** https://asistente-cun-rag.streamlit.app/
+**📂 Repositorio:** https://github.com/monicagaravito/aca2-chatbot-rag-cun
+
 ---
 
 ## ¿Qué hace?
