@@ -4,7 +4,7 @@
 **Asignatura:** Computación en la Nube | **Docente:** Dr. Hamilton Rivera Flor
 **Pilar:** Educación (normatividad institucional y permanencia estudiantil)
 
-**Integrantes:** Jhoan Ezequiel Hurtado Ramos · Melania Martinez · Anderson Rojas · Camila Artega · Monica Garavito
+**Integrantes:** Jhoan Ezequiel Hurtado Ramos · Melania Martinez · Anderson Rojas · Camila Arteaga · Monica Garavito
 
 **🔗 Aplicación en línea:** https://asistente-cun-rag.streamlit.app/
 **📂 Repositorio:** https://github.com/monicagaravito/aca2-chatbot-rag-cun
