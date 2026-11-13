@@ -265,6 +265,23 @@ def _historial_a_texto(historial: list[dict], turnos: int = TURNOS_HISTORIAL) ->
     )
 
 
+_RE_SEGUIMIENTO = re.compile(
+    r"^\s*¿?\s*(y|e|o|pero|entonces|tambi[eé]n|adem[aá]s)\b"
+    r"|\b(eso|esa|ese|esto|esta|este|ello|aquello|lo anterior|dicho|dicha|mismo|misma)\b",
+    re.IGNORECASE,
+)
+
+
+def necesita_reformulacion(pregunta: str, historial: list[dict]) -> bool:
+    """Solo se reformula si hay historial y la pregunta parece de seguimiento
+    (muy corta o con conectores/referencias como 'y...', 'eso', 'lo anterior').
+    Así se evita una llamada extra al LLM en preguntas completas."""
+    if not historial:
+        return False
+    palabras = len(re.findall(r"\w+", pregunta))
+    return palabras <= 6 or bool(_RE_SEGUIMIENTO.search(pregunta))
+
+
 def reformular_pregunta(gemini, modelos, pregunta: str, historial: list[dict]) -> str:
     """Convierte una pregunta de seguimiento ('¿y si no cumplo eso?') en una pregunta autónoma
     para que la búsqueda vectorial encuentre los fragmentos correctos."""
@@ -322,7 +339,9 @@ def responder(qdrant, gemini, pregunta: str, historial: list[dict] | None = None
 
     t0 = time.perf_counter()
     pregunta_busqueda = (
-        reformular_pregunta(gemini, modelos, pregunta, historial) if usar_reformulacion else pregunta
+        reformular_pregunta(gemini, modelos, pregunta, historial)
+        if usar_reformulacion and necesita_reformulacion(pregunta, historial)
+        else pregunta
     )
     t1 = time.perf_counter()
     todos = recuperar(qdrant, gemini, pregunta_busqueda, top_k, tipo_fuente, umbral)
@@ -352,6 +371,7 @@ def responder(qdrant, gemini, pregunta: str, historial: list[dict] | None = None
         "citas": citas,
         "citas_validas": [c for c in citas if c in ids_validos],
         "se_abstuvo": FRASE_ABSTENCION in respuesta.lower() or "fuera del alcance" in respuesta.lower(),
+        "marca": time.time(),  # momento en que se generó (permite detectar respuestas en caché)
         "tiempos": {
             "reformulacion_s": round(t1 - t0, 2),
             "recuperacion_s": round(t2 - t1, 2),

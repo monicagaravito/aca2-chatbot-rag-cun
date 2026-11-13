@@ -3,6 +3,8 @@
 # Chatbot RAG: Qdrant Cloud (base vectorial ACA 1) + Google Gemini (LLM)
 # Ejecutar localmente:  streamlit run app.py
 # =====================================================================
+import json
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -34,6 +36,16 @@ def clientes():
 @st.cache_data(ttl=3600, show_spinner=False)
 def lista_modelos(_gemini):
     return rag.modelos_disponibles(_gemini)
+
+
+@st.cache_data(ttl=6 * 3600, max_entries=200, show_spinner=False)
+def responder_con_cache(_qdrant, _gemini, pregunta, historial_json, modelos, top_k, filtro, umbral,
+                        temperatura, reformular):
+    """Guarda las respuestas: si se repite la misma pregunta con la misma configuración,
+    se devuelve al instante sin volver a consumir la cuota de Gemini."""
+    return rag.responder(_qdrant, _gemini, pregunta, historial=json.loads(historial_json),
+                         modelos=list(modelos), top_k=top_k, tipo_fuente=filtro, umbral=umbral,
+                         params={"temperature": temperatura}, usar_reformulacion=reformular)
 
 
 @st.cache_data(ttl=120, show_spinner="Leyendo la base vectorial...")
@@ -93,8 +105,13 @@ tab_chat, tab_docs, tab_eval, tab_arq = st.tabs(
 def mostrar_fuentes(r):
     """Tabla y texto de los fragmentos recuperados para una respuesta."""
     t = r["tiempos"]
-    st.caption(f"⏱️ {t['total_s']} s (búsqueda {t['recuperacion_s']} s · generación {t['generacion_s']} s) · "
-               f"modelo: {r['modelo']} · citas válidas: {len(r['citas_validas'])}/{len(r['citas'])}")
+    reform = f"reformulación {t['reformulacion_s']} s · " if t.get("reformulacion_s", 0) > 0.05 else ""
+    if r.get("desde_cache"):
+        tiempo = "⚡ respuesta instantánea (pregunta repetida, guardada en caché)"
+    else:
+        tiempo = (f"⏱️ {t['total_s']} s ({reform}búsqueda {t['recuperacion_s']} s · "
+                  f"generación {t['generacion_s']} s)")
+    st.caption(f"{tiempo} · modelo: {r['modelo']} · citas válidas: {len(r['citas_validas'])}/{len(r['citas'])}")
     with st.expander(f"📎 Fuentes recuperadas ({len(r['fragmentos'])})"):
         if r["pregunta_busqueda"] != r["pregunta"]:
             st.write(f"**Búsqueda reformulada:** {r['pregunta_busqueda']}")
@@ -131,9 +148,12 @@ with tab_chat:
         with st.chat_message("assistant", avatar="🎓"):
             with st.spinner("Buscando en la base vectorial y redactando..."):
                 try:
-                    r = rag.responder(qdrant, gemini, pregunta, historial=historial, modelos=MODELOS_ORDEN,
-                                      top_k=top_k, tipo_fuente=FILTRO, umbral=umbral, params=PARAMS,
-                                      usar_reformulacion=reformular)
+                    inicio = time.time()
+                    r = dict(responder_con_cache(
+                        qdrant, gemini, pregunta, json.dumps(historial, ensure_ascii=False),
+                        tuple(MODELOS_ORDEN), top_k, FILTRO, umbral, temperatura, reformular,
+                    ))
+                    r["desde_cache"] = r.get("marca", inicio) < inicio
                 except Exception as e:
                     st.error(f"Error al generar la respuesta: {e}")
                     st.stop()
